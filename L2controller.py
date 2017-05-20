@@ -88,8 +88,8 @@ class L2C(app_manager.RyuApp):
         # dst_mac, src_mac, dst_ip, src_ip
         dst_mac = pkt_arp.src_mac
         src_mac = self.gateway_mac
-        dst_ip = pkt_arp.dst_ip
-        src_ip = pkt_arp.src_ip
+        dst_ip = pkt_arp.src_ip
+        src_ip = pkt_arp.dst_ip
         print('ARP Reply : ', src_ip, ' > ', dst_ip)
         pkt = packet.Packet()
         pkt.add_protocol(ethernet.ethernet(ethertype=pkt_ethernet.ethertype,
