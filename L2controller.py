@@ -16,7 +16,7 @@ class BAKAHUB(app_manager.RyuApp):
     def __init__(self, *args, **kwargs):
         super(BAKAHUB, self).__init__(*args, **kwargs)
         self.gateway_mac = '11:11:11:11:11:11'
-        self.gateway_ip = '172.16.0.1'
+        self.gateway_ip = '172.16.1.254'
         self.gateway_port = 3
         self.method = [self._arp_reply, self._handle_icmp, self._arp_request]
 
@@ -29,16 +29,16 @@ class BAKAHUB(app_manager.RyuApp):
                                           ofproto.OFPCML_NO_BUFFER)]
         # Gateway へのarp
         match = parser.OFPMatch(eth_dst='ff:ff:ff:ff:ff:ff', eth_type=0x0800, arp_spa=self.gateway_ip)
-        self.add_flow(datapath, 0, 0, match, actions, 0)
+        self.add_flow(datapath, 0, 30000, match, actions, 0)
         # Gateway へのicmp
         match = parser.OFPMatch(eth_dst=self.gateway_mac, eth_type=0x0800, ipv4_dst=self.gateway_ip)
-        self.add_flow(datapath, 1, 0, match, actions, 0)
+        self.add_flow(datapath, 1, 30000, match, actions, 0)
         # LAN from L3
         match = parser.OFPMatch(eth_src=self.gateway_mac, eth_type=0x0800, ipv4_dst=('172.16.0.1', '255.255.255.0'))
-        self.add_flow(datapath, 2, 0, match, actions, 0)
+        self.add_flow(datapath, 2, 30005, match, actions, 0)
         # register Reply to request LAN from L3
         match = parser.OFPMatch(eth_dst=self.gateway_mac, eth_type=0x0800, arp_spa=self.gateway_ip)
-        self.add_flow(datapath, 3, 0, match, actions, 0)
+        self.add_flow(datapath, 3, 30005, match, actions, 0)
 
     def add_flow(self, datapath, cookie, priority, match, actions, idle_timeout):
         ofproto = datapath.ofproto
