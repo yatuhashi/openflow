@@ -79,7 +79,9 @@ class L2C(app_manager.RyuApp):
         pkt = packet.Packet(data)
         pkt_ethernet = pkt.get_protocol(ethernet.ethernet)
         pkt_arp = pkt.get_protocol(arp.arp)
-        if pkt.get_protocol(arp.arp):
+        if pkt_arp:
+            pass
+        else:
             return
         if pkt_arp.opcode != arp.ARP_REQUEST:
             return
