@@ -143,8 +143,8 @@ class L2C(app_manager.RyuApp):
         src_mac = self.gateway_mac
         src_ip = self.gateway_ip
         dst_mac = pkt_ethernet.src
-        dst_ip = pkt_ipv4.src_ip
-        print('ICMP : ', pkt_ipv4.src, ' > ', pkt_ipv4.dst)
+        dst_ip = pkt_ipv4.src
+        print('ICMP : ', pkt_ipv4.src, ' > ', dst_ip)
         # ICMPを作成して返す
         pkt = packet.Packet()
         pkt.add_protocol(ethernet.ethernet(ethertype=pkt_ethernet.ethertype,
