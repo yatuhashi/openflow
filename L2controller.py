@@ -10,11 +10,11 @@ from ryu.lib.packet import ipv4
 from ryu.lib.packet import icmp
 
 
-class BAKAHUB(app_manager.RyuApp):
+class L2C(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
 
     def __init__(self, *args, **kwargs):
-        super(BAKAHUB, self).__init__(*args, **kwargs)
+        super(L2C, self).__init__(*args, **kwargs)
         self.gateway_mac = '11:11:11:11:11:11'
         self.gateway_ip = '172.16.1.254'
         self.gateway_port = 3
@@ -56,7 +56,7 @@ class BAKAHUB(app_manager.RyuApp):
         cookie = msg.cookie
         port = msg.match['in_port']
         data = msg.data
-        print(cookie)
+        print("ck : ", cookie)
         self.method[cookie](datapath, port, data)
 
     def _arp_reply(self, datapath, port, data):
@@ -110,19 +110,31 @@ class BAKAHUB(app_manager.RyuApp):
         # パケットを送信する
         self._send_packet(datapath, port, pkt)
 
-    def _handle_icmp(self, datapath, port, pkt_ethernet, pkt_ipv4, pkt_icmp, SrcGroup):
+    def _handle_icmp(self, datapath, port, data):
         # パケットがICMP ECHOリクエストでなかった場合はすぐに返す
         # 自分のゲートウェイIPアドレスをもっているグループでなかったら終了
-        print('ICMP : ', pkt_ipv4.src, ' > ', pkt_ipv4.dst)
-        if pkt_icmp.type != icmp.ICMP_ECHO_REQUEST or pkt_ipv4.dst != self.group_mac[SrcGroup][0][0]:
+        pkt = packet.Packet(data)
+        pkt_icmp = pkt.get_protocol(icmp.icmp)
+        pkt_ethernet = pkt.get_protocol(ethernet.ethernet)
+        pkt_ipv4 = pkt.get_protocol(ipv4.ipv4)
+        if pkt_ipv4:
+            pass
+        else:
             return
+        if pkt_icmp.type != icmp.ICMP_ECHO_REQUEST or pkt_ipv4.dst != self.gateway_ip:
+            return
+        src_mac = self.gateway_mac
+        src_ip = self.gateway_ip
+        dst_mac = pkt_ethernet.src
+        dst_ip = pkt_ipv4.src_ip
+        print('ICMP : ', pkt_ipv4.src, ' > ', pkt_ipv4.dst)
         # ICMPを作成して返す
         pkt = packet.Packet()
         pkt.add_protocol(ethernet.ethernet(ethertype=pkt_ethernet.ethertype,
-                                           dst=pkt_ethernet.src,
-                                           src=self.gateway_mac))  # ゲートウェイのmac
-        pkt.add_protocol(ipv4.ipv4(dst=pkt_ipv4.src,
-                                   src=self.group_mac[SrcGroup][0][0],  # ゲートウェイのIP
+                                           dst=dst_mac,
+                                           src=src_mac))  # ゲートウェイのmac
+        pkt.add_protocol(ipv4.ipv4(dst=dst_ip,
+                                   src=src_ip,  # ゲートウェイのIP
                                    proto=pkt_ipv4.proto))
         pkt.add_protocol(icmp.icmp(type_=icmp.ICMP_ECHO_REPLY,
                                    code=icmp.ICMP_ECHO_REPLY_CODE,
