@@ -34,7 +34,7 @@ class L2C(app_manager.RyuApp):
         match = parser.OFPMatch(eth_dst=self.gateway_mac, eth_type=0x0800, ipv4_dst=self.gateway_ip)
         self.add_flow(datapath, 1, 30000, match, actions, 0)
         # LAN from L3
-        match = parser.OFPMatch(eth_src=self.gateway_mac, eth_type=0x0800, ipv4_dst=('172.16.0.1', '255.255.255.0'))
+        match = parser.OFPMatch(eth_src=self.gateway_mac, eth_type=0x0800, ipv4_dst=(self.gateway_ip, '255.255.255.0'))
         self.add_flow(datapath, 2, 30005, match, actions, 0)
         # register Reply to request LAN from L3
         match = parser.OFPMatch(eth_dst=self.gateway_mac, eth_type=0x0800, arp_spa=self.gateway_ip)
@@ -48,6 +48,21 @@ class L2C(app_manager.RyuApp):
         mod = parser.OFPFlowMod(datapath=datapath, cookie=cookie, priority=priority,
                                 match=match, instructions=inst, idle_timeout=idle_timeout)
         datapath.send_msg(mod)
+
+    def _send_packet(self, datapath, port, pkt):
+        # 作られたパケットをOut-Packetメッセージ送り送信する
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+        pkt.serialize()
+        # self.logger.info("packet-out %s" % (pkt,))
+        data = pkt.data
+        actions = [parser.OFPActionOutput(port=port)]
+        out = parser.OFPPacketOut(datapath=datapath,
+                                  buffer_id=ofproto.OFP_NO_BUFFER,
+                                  in_port=ofproto.OFPP_CONTROLLER,
+                                  actions=actions,
+                                  data=data)
+        datapath.send_msg(out)
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
@@ -108,7 +123,7 @@ class L2C(app_manager.RyuApp):
                                  dst_mac='ff:ff:ff:ff:ff:ff',
                                  dst_ip=dst_ip))
         # パケットを送信する
-        self._send_packet(datapath, port, pkt)
+        self._send_packet(datapath, ofproto_v1_3.OFPP_FLOOD, pkt)
 
     def _handle_icmp(self, datapath, port, data):
         # パケットがICMP ECHOリクエストでなかった場合はすぐに返す
