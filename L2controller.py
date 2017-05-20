@@ -18,6 +18,7 @@ class BAKAHUB(app_manager.RyuApp):
         self.gateway_mac = '11:11:11:11:11:11'
         self.gateway_ip = '172.16.0.1'
         self.gateway_port = 3
+        self.method = [self._arp_reply, self._handle_icmp, self._arp_request]
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
@@ -28,14 +29,14 @@ class BAKAHUB(app_manager.RyuApp):
                                           ofproto.OFPCML_NO_BUFFER)]
         # Gateway へのarp
         match = parser.OFPMatch(eth_dst='ff:ff:ff:ff:ff:ff', eth_type=0x0800, arp_spa=self.gateway_ip)
-        self.add_flow(datapath, 1, 0, match, actions, 0)
+        self.add_flow(datapath, 0, 0, match, actions, 0)
         # Gateway へのicmp
         match = parser.OFPMatch(eth_dst=self.gateway_mac, eth_type=0x0800, ipv4_dst=self.gateway_ip)
-        self.add_flow(datapath, 2, 0, match, actions, 0)
+        self.add_flow(datapath, 1, 0, match, actions, 0)
         # LAN from L3
         match = parser.OFPMatch(eth_src=self.gateway_mac, eth_type=0x0800, ipv4_dst=('172.16.0.1', '255.255.255.0'))
-        self.add_flow(datapath, 3, 0, match, actions, 0)
-        # Reply to request LAN from L3
+        self.add_flow(datapath, 2, 0, match, actions, 0)
+        # register Reply to request LAN from L3
         match = parser.OFPMatch(eth_dst=self.gateway_mac, eth_type=0x0800, arp_spa=self.gateway_ip)
         self.add_flow(datapath, 3, 0, match, actions, 0)
 
@@ -53,33 +54,25 @@ class BAKAHUB(app_manager.RyuApp):
         msg = ev.msg
         datapath = msg.datapath
         cookie = msg.cookie
-        print(cookie)
-        # ofproto = datapath.ofproto
-        # parser = datapath.ofproto_parser
-        dpid = datapath.id
-        pkt = packet.Packet(msg.data)
-        pkt_ethernet = pkt.get_protocol(ethernet.ethernet)
-        if not pkt_ethernet:
-            return
         port = msg.match['in_port']
-        self.logger.info("packet in %s %s %s %s", dpid, port)
-        # ARP処理
-        pkt_arp = pkt.get_protocol(arp.arp)
-        if pkt_arp:
-            # ARP情報があった場合、ARPリクエストだった場合はARPリクエストを返す
-            self._handle_arp(datapath, port, pkt_ethernet, pkt_arp)
-            return
-        # ICMP処理
-        pkt_ipv4 = pkt.get_protocol(ipv4.ipv4)
-        pkt_icmp = pkt.get_protocol(icmp.icmp)
-        if pkt_icmp:
-            # ICMP情報があった場合、ICMPリクエストだった場合はICMPを返す
-            self._handle_icmp(datapath, port, pkt_ethernet, pkt_ipv4, pkt_icmp)
-            return
-        # ARP rquest search IP from L3
+        data = msg.data
+        print(cookie)
+        self.method[cookie](datapath, port, data)
 
-    def _arp_reply(self, datapath, port, pkt_ethernet, dst_mac, src_mac, dst_ip, src_ip):
+    def _arp_reply(self, datapath, port, data):
         # ARPリプライを生成する
+        pkt = packet.Packet(data)
+        pkt_ethernet = pkt.get_protocol(ethernet.ethernet)
+        pkt_arp = pkt.get_protocol(arp.arp)
+        if pkt.get_protocol(arp.arp):
+            return
+        if pkt_arp.opcode != arp.ARP_REQUEST:
+            return
+        # dst_mac, src_mac, dst_ip, src_ip
+        dst_mac = pkt_arp.src_mac
+        src_mac = self.gateway_mac
+        dst_ip = pkt_arp.dst_ip
+        src_ip = pkt_arp.src_ip
         print('ARP Reply : ', src_ip, ' > ', dst_ip)
         pkt = packet.Packet()
         pkt.add_protocol(ethernet.ethernet(ethertype=pkt_ethernet.ethertype,
@@ -93,8 +86,17 @@ class BAKAHUB(app_manager.RyuApp):
         # パケットを送信する
         self._send_packet(datapath, port, pkt)
 
-    def _arp_request(self, datapath, port, pkt_ethernet, src_mac, dst_ip, src_ip):
-        # ARPリクエストを生成する
+    def _arp_request(self, datapath, port, data):
+        # ARPリクエストを生成する creste from icmp or v4 packet
+        pkt = packet.Packet(data)
+        pkt_ethernet = pkt.get_protocol(ethernet.ethernet)
+        src_mac = self.gateway_mac
+        pkt_ipv4 = pkt.get_protocol(ipv4.ipv4)
+        if pkt_ipv4:
+            dst_ip = pkt_ipv4.dst_ip
+        else:
+            return
+        src_ip = self.gateway_ip
         print('ARP Request : ', src_ip, ' > ', dst_ip)
         pkt = packet.Packet()
         pkt.add_protocol(ethernet.ethernet(ethertype=pkt_ethernet.ethertype,
