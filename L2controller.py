@@ -18,25 +18,28 @@ class L2C(app_manager.RyuApp):
         self.gateway_mac = '11:11:11:11:11:11'
         self.gateway_ip = '172.16.1.254'
         self.gateway_port = 3
-        self.method = [self._arp_reply, self._handle_icmp, self._arp_request]
+        self.method = [self._arp_reply, self._handle_icmp, self._arp_request, self.register_ip]
+        # 溜まっていったbuffer をいつ消すか？
+        self.buffer = {}
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
         datapath = ev.msg.datapath
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
-        actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
-                                          ofproto.OFPCML_NO_BUFFER)]
+        actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)]
         # Gateway へのarp
         match = parser.OFPMatch(eth_dst='ff:ff:ff:ff:ff:ff', eth_type=0x0806, arp_tpa=self.gateway_ip)
         self.add_flow(datapath, 0, 30004, match, actions, 0)
         # Gateway へのicmp
         match = parser.OFPMatch(eth_dst=self.gateway_mac, eth_type=0x0800, ipv4_dst=self.gateway_ip)
         self.add_flow(datapath, 1, 30004, match, actions, 0)
-        # LAN from L3
+        # LAN from L3 remain buffer
+        actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER)]
         match = parser.OFPMatch(eth_src=self.gateway_mac, eth_type=0x0800, ipv4_dst=(self.gateway_ip, '255.255.255.0'))
         self.add_flow(datapath, 2, 30005, match, actions, 0)
         # register Reply to request LAN from L3
+        actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)]
         match = parser.OFPMatch(eth_dst=self.gateway_mac, eth_type=0x0806, arp_tpa=self.gateway_ip)
         self.add_flow(datapath, 3, 30005, match, actions, 0)
 
@@ -49,16 +52,17 @@ class L2C(app_manager.RyuApp):
                                 match=match, instructions=inst, idle_timeout=idle_timeout)
         datapath.send_msg(mod)
 
-    def _send_packet(self, datapath, port, pkt):
+    def _send_packet(self, datapath, port, pkt, buffer_id):
         # 作られたパケットをOut-Packetメッセージ送り送信する
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
         pkt.serialize()
         # self.logger.info("packet-out %s" % (pkt,))
+        # buffer を使う場合は、dataを省略する
         data = pkt.data
         actions = [parser.OFPActionOutput(port=port)]
         out = parser.OFPPacketOut(datapath=datapath,
-                                  buffer_id=ofproto.OFP_NO_BUFFER,
+                                  buffer_id=buffer_id,
                                   in_port=ofproto.OFPP_CONTROLLER,
                                   actions=actions,
                                   data=data)
@@ -72,9 +76,27 @@ class L2C(app_manager.RyuApp):
         port = msg.match['in_port']
         data = msg.data
         print("ck : ", cookie)
-        self.method[cookie](datapath, port, data)
+        self.method[cookie](msg, datapath, port, data)
 
-    def _arp_reply(self, datapath, port, data):
+    def _regsiter_ip(self, msg, datapath, port, data):
+        pkt = packet.Packet(data)
+        pkt_arp = pkt.get_protocol(arp.arp)
+        if pkt_arp:
+            pass
+        else:
+            return
+        if pkt_arp.opcode != arp.ARP_REV_REPLY:
+            return
+        dst_ip = pkt_arp.src_ip
+        # 溜まってるbuffer_idのパケットを全部出す
+        for i in self.buffer[dst_ip]:
+            self._send_packet(datapath, port, pkt, i)
+        parser = datapath.ofproto_parser
+        match = parser.OFPMatch(eth_src=self.gateway_mac, eth_type=0x0800, ipv4_dst=dst_ip)
+        actions = [parser.OFPActionOutput(port)]
+        self.add_flow(datapath, 3, 30006, match, actions, 0)
+
+    def _arp_reply(self, msg, datapath, port, data):
         # ARPリプライを生成する
         pkt = packet.Packet(data)
         pkt_ethernet = pkt.get_protocol(ethernet.ethernet)
@@ -101,9 +123,10 @@ class L2C(app_manager.RyuApp):
                                  dst_mac=dst_mac,
                                  dst_ip=dst_ip))
         # パケットを送信する
-        self._send_packet(datapath, port, pkt)
+        ofproto = datapath.ofproto
+        self._send_packet(datapath, port, pkt, ofproto.OFP_NO_BUFFER)
 
-    def _arp_request(self, datapath, port, data):
+    def _arp_request(self, msg, datapath, port, data):
         # ARPリクエストを生成する creste from icmp or v4 packet
         pkt = packet.Packet(data)
         pkt_ethernet = pkt.get_protocol(ethernet.ethernet)
@@ -113,6 +136,11 @@ class L2C(app_manager.RyuApp):
             dst_ip = pkt_ipv4.dst_ip
         else:
             return
+        # Buffer IDを控えておく
+        if dst_ip in self.buffer:
+            self.buffer[dst_ip].append(msg.buffer_id)
+        else:
+            self.buffer[dst_ip] = [msg.buffer_id]
         src_ip = self.gateway_ip
         print('ARP Request : ', src_ip, ' > ', dst_ip)
         pkt = packet.Packet()
@@ -125,9 +153,10 @@ class L2C(app_manager.RyuApp):
                                  dst_mac='ff:ff:ff:ff:ff:ff',
                                  dst_ip=dst_ip))
         # パケットを送信する
-        self._send_packet(datapath, ofproto_v1_3.OFPP_FLOOD, pkt)
+        ofproto = datapath.ofproto
+        self._send_packet(datapath, ofproto_v1_3.OFPP_FLOOD, pkt, ofproto.OFP_NO_BUFFER)
 
-    def _handle_icmp(self, datapath, port, data):
+    def _handle_icmp(self, msg, datapath, port, data):
         # パケットがICMP ECHOリクエストでなかった場合はすぐに返す
         # 自分のゲートウェイIPアドレスをもっているグループでなかったら終了
         pkt = packet.Packet(data)
