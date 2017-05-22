@@ -1,7 +1,4 @@
 from ryu.base import app_manager
-from ryu.controller import ofp_event
-from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER
-from ryu.controller.handler import set_ev_cls
 from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
@@ -10,21 +7,21 @@ from ryu.lib.packet import ipv4
 from ryu.lib.packet import icmp
 
 
-class L2C(app_manager.RyuApp):
+class L2DynamicEntry(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
 
     def __init__(self, *args, **kwargs):
-        super(L2C, self).__init__(*args, **kwargs)
-        self.gateway_mac = '11:11:11:11:11:11'
-        self.gateway_ip = '172.16.1.254'
-        self.gateway_port = 3
+        super(L2DynamicEntry, self).__init__(*args, **kwargs)
+        self.gateway_ip = kwargs["ip"]
+        self.gateway_mac = kwargs["mac"]
+        self.gateway_port = int(kwargs["port"])
+        self.gateway_subnet_ip = kwargs["subnet_ip"]  # 172.16.0.1
+        self.gateway_subnet_mask = kwargs["subnet_mask"]  # 255.255.255.0
+        self.switch_ev = kwargs["ev"]
         self.method = [self._arp_reply, self._handle_icmp, self._arp_request, self.register_ip]
         # 溜まっていったbuffer をいつ消すか？
         self.buffer = {}
-
-    @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
-    def switch_features_handler(self, ev):
-        datapath = ev.msg.datapath
+        datapath = self.switch_ev.msg.datapath
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)]
@@ -42,41 +39,6 @@ class L2C(app_manager.RyuApp):
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)]
         match = parser.OFPMatch(eth_dst=self.gateway_mac, eth_type=0x0806, arp_tpa=self.gateway_ip)
         self.add_flow(datapath, 3, 30005, match, actions, 0)
-
-    def add_flow(self, datapath, cookie, priority, match, actions, idle_timeout):
-        ofproto = datapath.ofproto
-        parser = datapath.ofproto_parser
-        inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,
-                                             actions)]
-        mod = parser.OFPFlowMod(datapath=datapath, cookie=cookie, priority=priority,
-                                match=match, instructions=inst, idle_timeout=idle_timeout)
-        datapath.send_msg(mod)
-
-    def _send_packet(self, datapath, port, pkt, buffer_id):
-        # 作られたパケットをOut-Packetメッセージ送り送信する
-        ofproto = datapath.ofproto
-        parser = datapath.ofproto_parser
-        pkt.serialize()
-        # self.logger.info("packet-out %s" % (pkt,))
-        # buffer を使う場合は、dataを省略する
-        data = pkt.data
-        actions = [parser.OFPActionOutput(port=port)]
-        out = parser.OFPPacketOut(datapath=datapath,
-                                  buffer_id=buffer_id,
-                                  in_port=ofproto.OFPP_CONTROLLER,
-                                  actions=actions,
-                                  data=data)
-        datapath.send_msg(out)
-
-    @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
-    def _packet_in_handler(self, ev):
-        msg = ev.msg
-        datapath = msg.datapath
-        cookie = msg.cookie
-        port = msg.match['in_port']
-        data = msg.data
-        print("ck : ", cookie)
-        self.method[cookie](msg, datapath, port, data)
 
     def _regsiter_ip(self, msg, datapath, port, data):
         pkt = packet.Packet(data)
@@ -155,6 +117,7 @@ class L2C(app_manager.RyuApp):
         # パケットを送信する
         ofproto = datapath.ofproto
         self._send_packet(datapath, ofproto_v1_3.OFPP_FLOOD, pkt, ofproto.OFP_NO_BUFFER)
+        self._send_packet(datapath, self.gateway_port, pkt, ofproto.OFP_NO_BUFFER)
 
     def _handle_icmp(self, msg, datapath, port, data):
         # パケットがICMP ECHOリクエストでなかった場合はすぐに返す
@@ -187,3 +150,28 @@ class L2C(app_manager.RyuApp):
                                    csum=0,
                                    data=pkt_icmp.data))
         self._send_packet(datapath, port, pkt)
+
+    def add_flow(self, datapath, cookie, priority, match, actions, idle_timeout):
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+        inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,
+                                             actions)]
+        mod = parser.OFPFlowMod(datapath=datapath, cookie=cookie, priority=priority,
+                                match=match, instructions=inst, idle_timeout=idle_timeout)
+        datapath.send_msg(mod)
+
+    def _send_packet(self, datapath, port, pkt, buffer_id):
+        # 作られたパケットをOut-Packetメッセージ送り送信する
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+        pkt.serialize()
+        # self.logger.info("packet-out %s" % (pkt,))
+        # buffer を使う場合は、dataを省略する
+        data = pkt.data
+        actions = [parser.OFPActionOutput(port=port)]
+        out = parser.OFPPacketOut(datapath=datapath,
+                                  buffer_id=buffer_id,
+                                  in_port=ofproto.OFPP_CONTROLLER,
+                                  actions=actions,
+                                  data=data)
+        datapath.send_msg(out)
