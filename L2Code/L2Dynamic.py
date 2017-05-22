@@ -84,8 +84,7 @@ class L2DynamicEntry(app_manager.RyuApp):
                                  dst_mac=dst_mac,
                                  dst_ip=dst_ip))
         # パケットを送信する
-        ofproto = datapath.ofproto
-        self._send_packet(datapath, port, pkt, ofproto.OFP_NO_BUFFER)
+        self._send_packet(datapath, port, pkt, datapath.ofproto.OFP_NO_BUFFER)
 
     def _arp_request(self, msg, datapath, port, data):
         # ARPリクエストを生成する creste from icmp or v4 packet
@@ -114,9 +113,8 @@ class L2DynamicEntry(app_manager.RyuApp):
                                  dst_mac='ff:ff:ff:ff:ff:ff',
                                  dst_ip=dst_ip))
         # パケットを送信する
-        ofproto = datapath.ofproto
-        self._send_packet(datapath, ofproto_v1_3.OFPP_FLOOD, pkt, ofproto.OFP_NO_BUFFER)
-        self._send_packet(datapath, self.gateway_port, pkt, ofproto.OFP_NO_BUFFER)
+        self._send_packet(datapath, ofproto_v1_3.OFPP_FLOOD, pkt, datapath.ofproto.OFP_NO_BUFFER)
+        self._send_packet(datapath, self.gateway_port, pkt, datapath.ofproto.OFP_NO_BUFFER)
 
     def _handle_icmp(self, msg, datapath, port, data):
         # パケットがICMP ECHOリクエストでなかった場合はすぐに返す
@@ -148,7 +146,7 @@ class L2DynamicEntry(app_manager.RyuApp):
                                    code=icmp.ICMP_ECHO_REPLY_CODE,
                                    csum=0,
                                    data=pkt_icmp.data))
-        self._send_packet(datapath, port, pkt)
+        self._send_packet(datapath, port, pkt, datapath.ofproto.OFP_NO_BUFFER)
 
     def add_flow(self, datapath, cookie, priority, match, actions, idle_timeout):
         ofproto = datapath.ofproto
