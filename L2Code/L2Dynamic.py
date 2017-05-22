@@ -5,6 +5,7 @@ from ryu.lib.packet import ethernet
 from ryu.lib.packet import arp
 from ryu.lib.packet import ipv4
 from ryu.lib.packet import icmp
+from ryu.ofproto import ether
 
 
 class L2DynamicEntry(app_manager.RyuApp):
@@ -89,7 +90,6 @@ class L2DynamicEntry(app_manager.RyuApp):
     def _arp_request(self, msg, datapath, port, data):
         # ARPリクエストを生成する creste from icmp or v4 packet
         pkt = packet.Packet(data)
-        pkt_ethernet = pkt.get_protocol(ethernet.ethernet)
         src_mac = self.gateway_mac
         pkt_ipv4 = pkt.get_protocol(ipv4.ipv4)
         if pkt_ipv4:
@@ -104,9 +104,9 @@ class L2DynamicEntry(app_manager.RyuApp):
         src_ip = self.gateway_ip
         print('ARP Request : ', src_ip, ' > ', dst_ip)
         pkt = packet.Packet()
-        pkt.add_protocol(ethernet.ethernet(ethertype=pkt_ethernet.ethertype,
+        pkt.add_protocol(ethernet.ethernet(ethertype=ether.ETH_TYPE_ARP,
                                            dst='ff:ff:ff:ff:ff:ff',
-                                           src=pkt_ethernet.src))
+                                           src=src_mac))
         pkt.add_protocol(arp.arp(opcode=arp.ARP_REQUEST,
                                  src_mac=src_mac,
                                  src_ip=src_ip,
