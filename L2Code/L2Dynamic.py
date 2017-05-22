@@ -11,14 +11,13 @@ class L2DynamicEntry(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
 
     def __init__(self, *args, **kwargs):
-        super(L2DynamicEntry, self).__init__(*args, **kwargs)
         self.gateway_ip = kwargs["ip"]
         self.gateway_mac = kwargs["mac"]
         self.gateway_port = int(kwargs["port"])
         self.gateway_subnet_ip = kwargs["subnet_ip"]  # 172.16.0.1
         self.gateway_subnet_mask = kwargs["subnet_mask"]  # 255.255.255.0
         self.switch_ev = kwargs["ev"]
-        self.method = [self._arp_reply, self._handle_icmp, self._arp_request, self.register_ip]
+        self.method = [self._arp_reply, self._handle_icmp, self._arp_request, self._register_ip]
         # 溜まっていったbuffer をいつ消すか？
         self.buffer = {}
         datapath = self.switch_ev.msg.datapath
@@ -40,7 +39,7 @@ class L2DynamicEntry(app_manager.RyuApp):
         match = parser.OFPMatch(eth_dst=self.gateway_mac, eth_type=0x0806, arp_tpa=self.gateway_ip)
         self.add_flow(datapath, 3, 30005, match, actions, 0)
 
-    def _regsiter_ip(self, msg, datapath, port, data):
+    def _register_ip(self, msg, datapath, port, data):
         pkt = packet.Packet(data)
         pkt_arp = pkt.get_protocol(arp.arp)
         if pkt_arp:

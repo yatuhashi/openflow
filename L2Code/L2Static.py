@@ -4,7 +4,6 @@ from ryu.ofproto import ofproto_v1_3
 class L2StaticEntry():
 
     def __init__(self, *args, **kwargs):
-        super(L2StaticEntry, self).__init__(*args, **kwargs)
         self.gateway_mac = kwargs["mac"]
         self.gateway_port = int(kwargs["port"])
         self.gateway_subnet_ip = kwargs["subnet_ip"]  # 172.16.0.1
