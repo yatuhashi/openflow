@@ -43,6 +43,7 @@ class L2DynamicEntry(app_manager.RyuApp):
     def _register_ip(self, msg, datapath, port, data):
         pkt = packet.Packet(data)
         pkt_arp = pkt.get_protocol(arp.arp)
+        print("Register IP : ", pkt_arp.src, "--", pkt_arp.opcode)
         if pkt_arp:
             pass
         else:
