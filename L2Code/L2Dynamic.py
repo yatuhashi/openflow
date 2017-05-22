@@ -93,7 +93,7 @@ class L2DynamicEntry(app_manager.RyuApp):
         src_mac = self.gateway_mac
         pkt_ipv4 = pkt.get_protocol(ipv4.ipv4)
         if pkt_ipv4:
-            dst_ip = pkt_ipv4.dst_ip
+            dst_ip = pkt_ipv4.dst
         else:
             return
         # Buffer IDを控えておく
