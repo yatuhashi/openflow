@@ -55,7 +55,7 @@ class L2DynamicEntry(app_manager.RyuApp):
             self._send_packet(datapath, port, pkt, i)
         parser = datapath.ofproto_parser
         match = parser.OFPMatch(eth_src=self.gateway_mac, eth_type=0x0800, ipv4_dst=dst_ip)
-        actions = [parser.OFPActionSetField(eth_dst=pkt_arp.src, ipv4_src=self.gateway_ip), parser.OFPActionOutput(port)]
+        actions = [parser.OFPActionSetField(eth_dst=pkt_arp.src), parser.OFPActionOutput(port)]
         self.add_flow(datapath, 3, 30006, match, actions, 60)
 
     def _arp_reply(self, msg, datapath, port, data):
