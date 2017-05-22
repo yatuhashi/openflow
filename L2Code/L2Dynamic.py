@@ -54,8 +54,8 @@ class L2DynamicEntry(app_manager.RyuApp):
             self._send_packet(datapath, port, pkt, i)
         parser = datapath.ofproto_parser
         match = parser.OFPMatch(eth_src=self.gateway_mac, eth_type=0x0800, ipv4_dst=dst_ip)
-        actions = [parser.OFPActionOutput(port)]
-        self.add_flow(datapath, 3, 30006, match, actions, 0)
+        actions = [parser.OFPActionSetField(eth_dst=pkt_arp.src), parser.OFPActionOutput(port)]
+        self.add_flow(datapath, 3, 30006, match, actions, 60)
 
     def _arp_reply(self, msg, datapath, port, data):
         # ARPリプライを生成する
@@ -105,7 +105,7 @@ class L2DynamicEntry(app_manager.RyuApp):
         print('ARP Request : ', src_ip, ' > ', dst_ip)
         pkt = packet.Packet()
         pkt.add_protocol(ethernet.ethernet(ethertype=pkt_ethernet.ethertype,
-                                           dst=pkt_ethernet.dst,
+                                           dst='ff:ff:ff:ff:ff:ff',
                                            src=pkt_ethernet.src))
         pkt.add_protocol(arp.arp(opcode=arp.ARP_REQUEST,
                                  src_mac=src_mac,
