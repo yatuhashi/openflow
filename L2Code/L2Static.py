@@ -10,8 +10,10 @@ class L2StaticEntry():
         self.gateway_subnet_mask = kwargs["subnet_mask"]  # 255.255.255.0
         self.switch_ev = kwargs["ev"]
         self.flood_entry(self.switch_ev)
-        self.nomatch_entry(self.switch_ev)
-        self.l3out_entry(self.switch_ev)
+        if(kwargs["L2out"]):
+            self.nomatch_entry(self.switch_ev)
+        if(kwargs["L3"]):
+            self.l3out_entry(self.switch_ev)
 
     def register_vm(self, mac, port, ev):  # VM to VM
         datapath = ev.msg.datapath

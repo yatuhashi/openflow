@@ -30,9 +30,9 @@ class L2DynamicEntry(app_manager.RyuApp):
         # Gateway へのicmp
         match = parser.OFPMatch(eth_dst=self.gateway_mac, eth_type=0x0800, ipv4_dst=self.gateway_ip)
         self.add_flow(datapath, 1, 30004, match, actions, 0)
-        # LAN from L3 remain buffer
+        # LAN from L3. remain packet buffer
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER)]
-        match = parser.OFPMatch(eth_src=self.gateway_mac, eth_type=0x0800, ipv4_dst=(self.gateway_ip, '255.255.255.0'))
+        match = parser.OFPMatch(eth_src=self.gateway_mac, eth_type=0x0800, ipv4_dst=(self.gateway_ip, self.gateway_subnet_mask))
         self.add_flow(datapath, 2, 30005, match, actions, 0)
         # register Reply to request LAN from L3
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)]
