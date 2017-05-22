@@ -12,35 +12,34 @@ class L2DynamicEntry(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
 
     def __init__(self, *args, **kwargs):
+        self.datapath = kwargs["datapath"]
         self.gateway_ip = kwargs["ip"]
         self.gateway_mac = kwargs["mac"]
         self.gateway_port = int(kwargs["port"])
         self.gateway_subnet_ip = kwargs["subnet_ip"]  # 172.16.0.1
         self.gateway_subnet_mask = kwargs["subnet_mask"]  # 255.255.255.0
-        self.switch_ev = kwargs["ev"]
         self.method = [self._arp_reply, self._handle_icmp, self._arp_request, self._register_ip]
         # 溜まっていったbuffer をいつ消すか？
         self.buffer = {}
-        datapath = self.switch_ev.msg.datapath
-        ofproto = datapath.ofproto
-        parser = datapath.ofproto_parser
+        ofproto = self.datapath.ofproto
+        parser = self.datapath.ofproto_parser
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)]
         # Gateway へのarp
         match = parser.OFPMatch(eth_dst='ff:ff:ff:ff:ff:ff', eth_type=0x0806, arp_tpa=self.gateway_ip)
-        self.add_flow(datapath, 0, 30004, match, actions, 0)
+        self.add_flow(0, 30004, match, actions, 0)
         # Gateway へのicmp
         match = parser.OFPMatch(eth_dst=self.gateway_mac, eth_type=0x0800, ipv4_dst=self.gateway_ip)
-        self.add_flow(datapath, 1, 30004, match, actions, 0)
+        self.add_flow(1, 30004, match, actions, 0)
         # LAN from L3. remain packet buffer
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER)]
         match = parser.OFPMatch(eth_src=self.gateway_mac, eth_dst=self.gateway_mac)
-        self.add_flow(datapath, 2, 30005, match, actions, 0)
+        self.add_flow(2, 30005, match, actions, 0)
         # register Reply to request LAN from L3
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)]
         match = parser.OFPMatch(eth_dst=self.gateway_mac, eth_type=0x0806, arp_tpa=self.gateway_ip)
-        self.add_flow(datapath, 3, 30005, match, actions, 0)
+        self.add_flow(3, 30005, match, actions, 0)
 
-    def _register_ip(self, msg, datapath, port, data):
+    def _register_ip(self, msg, port, data):
         pkt = packet.Packet(data)
         pkt_ethernet = pkt.get_protocol(ethernet.ethernet)
         pkt_arp = pkt.get_protocol(arp.arp)
@@ -56,12 +55,12 @@ class L2DynamicEntry(app_manager.RyuApp):
         # for i in self.buffer[dst_ip]:
         #     self._send_packet(datapath, port, pkt, i)
         print("Register IP : ", pkt_ethernet.src, "--", dst_ip)
-        parser = datapath.ofproto_parser
+        parser = self.datapath.ofproto_parser
         match = parser.OFPMatch(eth_src=self.gateway_mac, eth_type=0x0800, ipv4_dst=dst_ip)
         actions = [parser.OFPActionSetField(eth_dst=pkt_ethernet.src), parser.OFPActionOutput(port)]
-        self.add_flow(datapath, 3, 30006, match, actions, 60)
+        self.add_flow(3, 30006, match, actions, 60)
 
-    def _arp_reply(self, msg, datapath, port, data):
+    def _arp_reply(self, msg, port, data):
         # ARPリプライを生成する
         pkt = packet.Packet(data)
         pkt_ethernet = pkt.get_protocol(ethernet.ethernet)
@@ -88,9 +87,9 @@ class L2DynamicEntry(app_manager.RyuApp):
                                  dst_mac=dst_mac,
                                  dst_ip=dst_ip))
         # パケットを送信する
-        self._send_packet(datapath, port, pkt, datapath.ofproto.OFP_NO_BUFFER)
+        self._send_packet(port, pkt, self.datapath.ofproto.OFP_NO_BUFFER)
 
-    def _arp_request(self, msg, datapath, port, data):
+    def _arp_request(self, msg, port, data):
         # ARPリクエストを生成する creste from icmp or v4 packet
         pkt = packet.Packet(data)
         src_mac = self.gateway_mac
@@ -116,10 +115,10 @@ class L2DynamicEntry(app_manager.RyuApp):
                                  dst_mac='ff:ff:ff:ff:ff:ff',
                                  dst_ip=dst_ip))
         # パケットを送信する
-        self._send_packet(datapath, ofproto_v1_3.OFPP_FLOOD, pkt, datapath.ofproto.OFP_NO_BUFFER)
-        self._send_packet(datapath, self.gateway_port, pkt, datapath.ofproto.OFP_NO_BUFFER)
+        self._send_packet(ofproto_v1_3.OFPP_FLOOD, pkt, self.datapath.ofproto.OFP_NO_BUFFER)
+        self._send_packet(self.gateway_port, pkt, self.datapath.ofproto.OFP_NO_BUFFER)
 
-    def _handle_icmp(self, msg, datapath, port, data):
+    def _handle_icmp(self, msg, port, data):
         # パケットがICMP ECHOリクエストでなかった場合はすぐに返す
         # 自分のゲートウェイIPアドレスをもっているグループでなかったら終了
         pkt = packet.Packet(data)
@@ -149,29 +148,29 @@ class L2DynamicEntry(app_manager.RyuApp):
                                    code=icmp.ICMP_ECHO_REPLY_CODE,
                                    csum=0,
                                    data=pkt_icmp.data))
-        self._send_packet(datapath, port, pkt, datapath.ofproto.OFP_NO_BUFFER)
+        self._send_packet(port, pkt, self.datapath.ofproto.OFP_NO_BUFFER)
 
-    def add_flow(self, datapath, cookie, priority, match, actions, idle_timeout):
-        ofproto = datapath.ofproto
-        parser = datapath.ofproto_parser
+    def add_flow(self, cookie, priority, match, actions, idle_timeout):
+        ofproto = self.datapath.ofproto
+        parser = self.datapath.ofproto_parser
         inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,
                                              actions)]
-        mod = parser.OFPFlowMod(datapath=datapath, cookie=cookie, priority=priority,
+        mod = parser.OFPFlowMod(datapath=self.datapath, cookie=cookie, priority=priority,
                                 match=match, instructions=inst, idle_timeout=idle_timeout)
-        datapath.send_msg(mod)
+        self.datapath.send_msg(mod)
 
-    def _send_packet(self, datapath, port, pkt, buffer_id):
+    def _send_packet(self, port, pkt, buffer_id):
         # 作られたパケットをOut-Packetメッセージ送り送信する
-        ofproto = datapath.ofproto
-        parser = datapath.ofproto_parser
+        ofproto = self.datapath.ofproto
+        parser = self.datapath.ofproto_parser
         pkt.serialize()
         # self.logger.info("packet-out %s" % (pkt,))
         # buffer を使う場合は、dataを省略する
         data = pkt.data
         actions = [parser.OFPActionOutput(port=port)]
-        out = parser.OFPPacketOut(datapath=datapath,
+        out = parser.OFPPacketOut(datapath=self.datapath,
                                   buffer_id=buffer_id,
                                   in_port=ofproto.OFPP_CONTROLLER,
                                   actions=actions,
                                   data=data)
-        datapath.send_msg(out)
+        self.datapath.send_msg(out)
