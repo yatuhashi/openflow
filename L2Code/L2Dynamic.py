@@ -32,7 +32,7 @@ class L2DynamicEntry(app_manager.RyuApp):
         self.add_flow(datapath, 1, 30004, match, actions, 0)
         # LAN from L3. remain packet buffer
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER)]
-        match = parser.OFPMatch(eth_src=self.gateway_mac, eth_type=0x0800, ipv4_dst=(self.gateway_ip, self.gateway_subnet_mask))
+        match = parser.OFPMatch(eth_src=self.gateway_mac, eth_dst=self.gateway_mac)
         self.add_flow(datapath, 2, 30005, match, actions, 0)
         # register Reply to request LAN from L3
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)]
@@ -54,7 +54,7 @@ class L2DynamicEntry(app_manager.RyuApp):
             self._send_packet(datapath, port, pkt, i)
         parser = datapath.ofproto_parser
         match = parser.OFPMatch(eth_src=self.gateway_mac, eth_type=0x0800, ipv4_dst=dst_ip)
-        actions = [parser.OFPActionSetField(eth_dst=pkt_arp.src), parser.OFPActionOutput(port)]
+        actions = [parser.OFPActionSetField(eth_dst=pkt_arp.src, ipv4_src=self.gateway_ip), parser.OFPActionOutput(port)]
         self.add_flow(datapath, 3, 30006, match, actions, 60)
 
     def _arp_reply(self, msg, datapath, port, data):
