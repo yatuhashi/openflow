@@ -33,7 +33,7 @@ class L2Operation(app_manager.RyuApp):
         cookie = msg.cookie
         port = msg.match['in_port']
         data = msg.data
-        sys.stdout.write(str(datapath.id) + " : ")
+        sys.stdout.write(str(datapath.id) + "-" + str(cookie) + "-" + str(port) + " : ")
         self.SwichOperation[datapath.id]["dynamic"].method[cookie](msg, datapath, port, data)
 
     def register_switch(self, did, ip, mac, subnet_ip, subnet_mask, port, L2out, L3, ev):
