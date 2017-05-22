@@ -8,20 +8,8 @@ L2 FlowEntry
 L2controller.py
 
 ```
-        if(datapath.id==4097):
-            self.SwichOperation[str(datapath.id)] = [
-                L2StaticEntry(mac="11:11:11:11:11:11",
-                              port=3,
-                              subnet_ip="172.16.1.1",
-                              subnet_mask="255.255.255.0",
-                              ev=ev),
-                L2DynamicEntry(ip="172.16.1.1",
-                               mac="11:11:11:11:11:11",
-                               port=3,
-                               subnet_ip="172.16.1.1",
-                               subnet_mask="255.255.255.0",
-                               ev=ev),
-            ]
+        if(did == 4097):
+            self.register_switch(did, "172.16.1.1", "11:11:11:11:11:11", "172.16.1.1", "255.255.255.0", 1, True, True, ev)
 ```
 
 Registered Flow
