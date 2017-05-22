@@ -43,10 +43,11 @@ class L2DynamicEntry(app_manager.RyuApp):
     def _register_ip(self, msg, datapath, port, data):
         pkt = packet.Packet(data)
         pkt_arp = pkt.get_protocol(arp.arp)
-        print("Register IP : ", pkt_arp.src, "--", pkt_arp.opcode)
+        print("Register IP : ", pkt_arp.src_ip, "--", pkt_arp.opcode)
         if pkt_arp:
             pass
         else:
+            print("not arp")
             return
         if pkt_arp.opcode != arp.ARP_REV_REPLY:
             return
@@ -54,7 +55,7 @@ class L2DynamicEntry(app_manager.RyuApp):
         # 溜まってるbuffer_idのパケットを全部出す
         for i in self.buffer[dst_ip]:
             self._send_packet(datapath, port, pkt, i)
-        print("Register IP : ", pkt_arp.src, "--", dst_ip)
+        print("Register IP : ", pkt_arp.src_mac, "--", dst_ip)
         parser = datapath.ofproto_parser
         match = parser.OFPMatch(eth_src=self.gateway_mac, eth_type=0x0800, ipv4_dst=dst_ip)
         actions = [parser.OFPActionSetField(eth_dst=pkt_arp.src), parser.OFPActionOutput(port)]
