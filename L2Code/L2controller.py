@@ -5,6 +5,7 @@ from ryu.controller.handler import set_ev_cls
 from ryu.ofproto import ofproto_v1_3
 from L2Static import L2StaticEntry
 from L2Dynamic import L2DynamicEntry
+import sys
 
 
 class L2Operation(app_manager.RyuApp):
@@ -32,6 +33,7 @@ class L2Operation(app_manager.RyuApp):
         cookie = msg.cookie
         port = msg.match['in_port']
         data = msg.data
+        sys.stdout.write(str(datapath.id) + "-" + str(cookie) + "-" + str(port) + " : ")
         self.SwichOperation[datapath.id]["dynamic"].method[cookie](msg, datapath, port, data)
 
     def register_switch(self, did, ip, mac, subnet_ip, subnet_mask, port, L2out, L3, ev):

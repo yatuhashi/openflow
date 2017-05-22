@@ -5,6 +5,7 @@ from ryu.lib.packet import ethernet
 from ryu.lib.packet import arp
 from ryu.lib.packet import ipv4
 from ryu.lib.packet import icmp
+from ryu.ofproto import ether
 
 
 class L2DynamicEntry(app_manager.RyuApp):
@@ -32,7 +33,7 @@ class L2DynamicEntry(app_manager.RyuApp):
         self.add_flow(datapath, 1, 30004, match, actions, 0)
         # LAN from L3. remain packet buffer
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER)]
-        match = parser.OFPMatch(eth_src=self.gateway_mac, eth_type=0x0800, ipv4_dst=(self.gateway_ip, self.gateway_subnet_mask))
+        match = parser.OFPMatch(eth_src=self.gateway_mac, eth_dst=self.gateway_mac)
         self.add_flow(datapath, 2, 30005, match, actions, 0)
         # register Reply to request LAN from L3
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)]
@@ -41,21 +42,24 @@ class L2DynamicEntry(app_manager.RyuApp):
 
     def _register_ip(self, msg, datapath, port, data):
         pkt = packet.Packet(data)
+        pkt_ethernet = pkt.get_protocol(ethernet.ethernet)
         pkt_arp = pkt.get_protocol(arp.arp)
+        print("Register IP : ", pkt_arp.src_ip, "--", pkt_arp.opcode)
         if pkt_arp:
             pass
         else:
             return
-        if pkt_arp.opcode != arp.ARP_REV_REPLY:
+        if pkt_arp.opcode != arp.ARP_REPLY:
             return
         dst_ip = pkt_arp.src_ip
         # 溜まってるbuffer_idのパケットを全部出す
         for i in self.buffer[dst_ip]:
             self._send_packet(datapath, port, pkt, i)
+        print("Register IP : ", pkt_ethernet.src, "--", dst_ip)
         parser = datapath.ofproto_parser
         match = parser.OFPMatch(eth_src=self.gateway_mac, eth_type=0x0800, ipv4_dst=dst_ip)
-        actions = [parser.OFPActionOutput(port)]
-        self.add_flow(datapath, 3, 30006, match, actions, 0)
+        actions = [parser.OFPActionSetField(eth_dst=pkt_ethernet.src), parser.OFPActionOutput(port)]
+        self.add_flow(datapath, 3, 30006, match, actions, 60)
 
     def _arp_reply(self, msg, datapath, port, data):
         # ARPリプライを生成する
@@ -89,7 +93,6 @@ class L2DynamicEntry(app_manager.RyuApp):
     def _arp_request(self, msg, datapath, port, data):
         # ARPリクエストを生成する creste from icmp or v4 packet
         pkt = packet.Packet(data)
-        pkt_ethernet = pkt.get_protocol(ethernet.ethernet)
         src_mac = self.gateway_mac
         pkt_ipv4 = pkt.get_protocol(ipv4.ipv4)
         if pkt_ipv4:
@@ -104,9 +107,9 @@ class L2DynamicEntry(app_manager.RyuApp):
         src_ip = self.gateway_ip
         print('ARP Request : ', src_ip, ' > ', dst_ip)
         pkt = packet.Packet()
-        pkt.add_protocol(ethernet.ethernet(ethertype=pkt_ethernet.ethertype,
-                                           dst=pkt_ethernet.dst,
-                                           src=pkt_ethernet.src))
+        pkt.add_protocol(ethernet.ethernet(ethertype=ether.ETH_TYPE_ARP,
+                                           dst='ff:ff:ff:ff:ff:ff',
+                                           src=src_mac))
         pkt.add_protocol(arp.arp(opcode=arp.ARP_REQUEST,
                                  src_mac=src_mac,
                                  src_ip=src_ip,
