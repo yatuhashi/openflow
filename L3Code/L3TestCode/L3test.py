@@ -17,8 +17,9 @@ class AddFlowEntry(app_manager.RyuApp):
     def switch_features_handler(self, ev):
         datapath = ev.msg.datapath
         print(datapath.id)
-        self.tmpl3_entry('172.16.1.1', 1, ev)
-        self.tmpl3_entry('172.16.2.1', 2, ev)
+        if(datapath.id == 1):
+            self.tmpl3_entry('172.16.1.1', 1, ev)
+            self.tmpl3_entry('172.16.2.1', 2, ev)
 
     def tmpl3_entry(self, dst_ip, out, ev):  # VM to VM
         datapath = ev.msg.datapath
