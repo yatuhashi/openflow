@@ -23,7 +23,7 @@ class AddFlowEntry(app_manager.RyuApp):
     def tmpl3_entry(self, dst_ip, out, ev):  # VM to VM
         datapath = ev.msg.datapath
         parser = datapath.ofproto_parser
-        match = parser.OFPMatch(eth_dst=self.gateway_mac, eth_src=self.gateway_mac, eth_typ=0x0800, ipv4_dst=dst_ip)
+        match = parser.OFPMatch(eth_dst=self.gateway_mac, eth_src=self.gateway_mac, eth_type=0x0800, ipv4_dst=dst_ip)
         actions = [parser.OFPActionOutput(out)]
         self.add_flow(datapath, 29995, match, actions, 0)
 
