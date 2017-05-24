@@ -19,6 +19,7 @@ class L2DynamicEntry(app_manager.RyuApp):
         self.gateway_subnet_ip = kwargs["subnet_ip"]  # 172.16.0.1
         self.gateway_subnet_mask = kwargs["subnet_mask"]  # 255.255.255.0
         self.method = [self._arp_reply, self._handle_icmp, self._arp_request, self._register_ip]
+        self.l3out_entry()
         # 溜まっていったbuffer をいつ消すか？
         self.buffer = {}
         ofproto = self.datapath.ofproto
@@ -59,6 +60,12 @@ class L2DynamicEntry(app_manager.RyuApp):
         match = parser.OFPMatch(eth_src=self.gateway_mac, eth_type=0x0800, ipv4_dst=dst_ip)
         actions = [parser.OFPActionSetField(eth_dst=pkt_ethernet.src), parser.OFPActionOutput(port)]
         self.add_flow(3, 30006, match, actions, 60)
+
+    def l3out_entry(self):  # L3 packet Out to Gateway
+        parser = self.datapath.ofproto_parser
+        match = parser.OFPMatch(eth_dst=self.gateway_mac)
+        actions = [parser.OFPActionSetField(eth_src=self.gateway_mac), parser.OFPActionOutput(self.gateway_port)]
+        self.add_flow(self.datapath, 29998, match, actions, 0)
 
     def _arp_reply(self, msg, port, data):
         # ARPリプライを生成する
