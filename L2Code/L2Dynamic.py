@@ -142,7 +142,7 @@ class L2DynamicEntry(app_manager.RyuApp):
         src_ip = self.gateway_ip
         dst_mac = pkt_ethernet.src
         dst_ip = pkt_ipv4.src
-        print('ICMP : ', pkt_ipv4.src, ' > ', dst_ip)
+        print('ICMP : ', self.gateway_ip, ' > ', dst_ip)
         # ICMPを作成して返す
         pkt = packet.Packet()
         pkt.add_protocol(ethernet.ethernet(ethertype=pkt_ethernet.ethertype,
