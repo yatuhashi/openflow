@@ -27,7 +27,7 @@ class L2Operation(app_manager.RyuApp):
         if(did == 4098):
             self.register_switch(datapath, "172.16.2.1", "11:11:11:11:11:11", "172.16.2.1", "255.255.255.0", 1, True)
 
-            self.SwichOperation[4098]["static"].register_vm("56:0a:9c:e6:86:3e", 4)
+            self.SwichOperation[4098]["static"].register_vm("56:0a:9c:e6:86:3e", 2)
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
