@@ -12,8 +12,6 @@ class L2StaticEntry():
         self.flood_entry()
         if(kwargs["L2out"]):
             self.nomatch_entry()
-        if(kwargs["L3"]):
-            self.l3out_entry()
 
     def register_vm(self, mac, port):  # VM to VM
         parser = self.datapath.ofproto_parser
@@ -32,12 +30,6 @@ class L2StaticEntry():
         match = parser.OFPMatch(eth_type=0x0800, ipv4_dst=(self.gateway_subnet_ip, self.gateway_subnet_mask))
         actions = [parser.OFPActionOutput(self.gateway_port)]
         self.add_flow(self.datapath, 29999, match, actions, 0)
-
-    def l3out_entry(self):  # L3 packet Out to Gateway
-        parser = self.datapath.ofproto_parser
-        match = parser.OFPMatch(eth_dst=self.gateway_mac)
-        actions = [parser.OFPActionSetField(eth_src=self.gateway_mac), parser.OFPActionOutput(self.gateway_port)]
-        self.add_flow(self.datapath, 29998, match, actions, 0)
 
     def add_flow(self, datapath, priority, match, actions, idle_timeout):
         """
