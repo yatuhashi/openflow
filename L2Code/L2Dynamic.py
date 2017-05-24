@@ -65,7 +65,7 @@ class L2DynamicEntry(app_manager.RyuApp):
         parser = self.datapath.ofproto_parser
         match = parser.OFPMatch(eth_dst=self.gateway_mac)
         actions = [parser.OFPActionSetField(eth_src=self.gateway_mac), parser.OFPActionOutput(self.gateway_port)]
-        self.add_flow(self.datapath, 29998, match, actions, 0)
+        self.add_flow(3, 29998, match, actions, 0)
 
     def _arp_reply(self, msg, port, data):
         # ARPリプライを生成する
