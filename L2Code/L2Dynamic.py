@@ -65,7 +65,7 @@ class L2DynamicEntry(app_manager.RyuApp):
         parser = self.datapath.ofproto_parser
         match = parser.OFPMatch(eth_dst=self.gateway_mac)
         actions = [parser.OFPActionSetField(eth_src=self.gateway_mac), parser.OFPActionOutput(self.gateway_port)]
-        self.add_flow(self.datapath, 29998, match, actions, 0)
+        self.add_flow(0, 29998, match, actions, 0)
 
     def _arp_reply(self, msg, port, data):
         # ARPリプライを生成する
@@ -142,7 +142,7 @@ class L2DynamicEntry(app_manager.RyuApp):
         src_ip = self.gateway_ip
         dst_mac = pkt_ethernet.src
         dst_ip = pkt_ipv4.src
-        print('ICMP : ', pkt_ipv4.src, ' > ', dst_ip)
+        print('ICMP : ', src_ip, ' >> ', dst_ip)
         # ICMPを作成して返す
         pkt = packet.Packet()
         pkt.add_protocol(ethernet.ethernet(ethertype=pkt_ethernet.ethertype,
