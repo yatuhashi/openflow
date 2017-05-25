@@ -53,13 +53,13 @@ class L2DynamicEntry(app_manager.RyuApp):
             return
         dst_ip = pkt_arp.src_ip
         # 溜まってるbuffer_idのパケットを全部出す
-        # for i in self.buffer[dst_ip]:
-        #     self._send_packet(datapath, port, pkt, i)
+        for i in self.buffer[dst_ip]:
+            self._send_rewrite_packet(pkt_ethernet.src, port, i)
         print("Register IP : ", pkt_ethernet.src, "--", dst_ip)
         parser = self.datapath.ofproto_parser
         match = parser.OFPMatch(eth_src=self.gateway_mac, eth_type=0x0800, ipv4_dst=dst_ip)
         actions = [parser.OFPActionSetField(eth_dst=pkt_ethernet.src), parser.OFPActionOutput(port)]
-        self.add_flow(3, 30006, match, actions, 60)
+        self.add_flow(3, 30006, match, actions, 120)
 
     def l3out_entry(self):  # L3 packet Out to Gateway
         parser = self.datapath.ofproto_parser
@@ -180,4 +180,16 @@ class L2DynamicEntry(app_manager.RyuApp):
                                   in_port=ofproto.OFPP_CONTROLLER,
                                   actions=actions,
                                   data=data)
+        self.datapath.send_msg(out)
+
+    def _send_rewrite_packet(self, mac, port, buffer_id):
+        # 作られたパケットをOut-Packetメッセージ送り送信する
+        ofproto = self.datapath.ofproto
+        parser = self.datapath.ofproto_parser
+        # buffer を使う場合は、dataを省略する
+        actions = [parser.OFPActionSetField(eth_dst=mac), parser.OFPActionOutput(port)]
+        out = parser.OFPPacketOut(datapath=self.datapath,
+                                  buffer_id=buffer_id,
+                                  in_port=ofproto.OFPP_CONTROLLER,
+                                  actions=actions)
         self.datapath.send_msg(out)

@@ -23,10 +23,8 @@ class L2Operation(app_manager.RyuApp):
         if(did == 4097):
             self.register_switch(datapath, "172.16.1.1", "11:11:11:11:11:11", "172.16.1.1", "255.255.255.0", 1, True)
             self.SwichOperation[4097]["static"].register_vm("1a:d0:63:c3:9e:2d", 3)
-
         if(did == 4098):
             self.register_switch(datapath, "172.16.2.1", "11:11:11:11:11:11", "172.16.2.1", "255.255.255.0", 1, True)
-
             self.SwichOperation[4098]["static"].register_vm("56:0a:9c:e6:86:3e", 2)
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
@@ -36,7 +34,7 @@ class L2Operation(app_manager.RyuApp):
         cookie = msg.cookie
         port = msg.match['in_port']
         data = msg.data
-        sys.stdout.write(str(datapath.id) + "-" + str(cookie) + "-" + str(port) + " : ")
+        sys.stdout.write("\n" + str(datapath.id) + "-" + str(cookie) + "-" + str(port) + " : ")
         self.SwichOperation[datapath.id]["dynamic"].method[cookie](msg, port, data)
 
     def register_switch(self, datapath, ip, mac, subnet_ip, subnet_mask, port, L2out):
