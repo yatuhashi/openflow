@@ -9,11 +9,11 @@ from L3Routing import L3RouteEntry
 import sys
 
 
-class L2Operation(app_manager.RyuApp):
+class Operation(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
 
     def __init__(self, *args, **kwargs):
-        super(L2Operation, self).__init__(*args, **kwargs)
+        super(Operation, self).__init__(*args, **kwargs)
         self.SwichOperation = {}
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
