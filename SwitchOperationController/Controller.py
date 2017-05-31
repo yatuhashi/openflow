@@ -23,7 +23,7 @@ class Operation(app_manager.RyuApp):
         print(did)
         if(did == 1):
             self.register_swex(datapath, "11:11:11:11:11:11", 1)
-            self.SwichOperation[1]["static"].in_to_in(1, 2, ('172.16.1.1', '255.255.255.0'), ('172.16.2.1', '255.255.255.0'))
+            self.SwichOperation[1]["dynamic"].in_to_in(1, 2, ('172.16.1.1', '255.255.255.0'), ('172.16.2.1', '255.255.255.0'))
         if(did == 4097):
             self.register_swin(datapath, "172.16.1.1", "11:11:11:11:11:11", "172.16.1.1", "255.255.255.0", 1, True)
             self.SwichOperation[4097]["static"].register_vm("1a:d0:63:c3:9e:2d", 3)
@@ -49,7 +49,7 @@ class Operation(app_manager.RyuApp):
 
     def register_swex(self, datapath, mac, port):
         self.SwichOperation[datapath.id] = {
-            "static": L3RouteEntry(datapath=datapath, mac=mac, port=port),
+            "dynamic": L3RouteEntry(datapath=datapath, mac=mac, port=port),
         }
 
     def register_in_to_in(self, swex_id, swin1_id, swin2_id):
