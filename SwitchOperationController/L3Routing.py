@@ -30,10 +30,9 @@ class L3RouteEntry():
         actions = [parser.OFPActionOutput(src_port)]
         self.add_flow(0, 30005, match, actions, 0)
 
-    def in_vlan_Host(self, src_port, dst_port, dst_mac, src_ipsub, dst_ipsub, vid):  # VM to another Host VM in L3 using VLAN
+    def in_vlan_Host(self, src_port, dst_mac, src_ipsub, dst_ipsub, vid):  # VM to another Host VM in L3 using VLAN
         """
         src_port : int
-        dst_port : int
         dst_mac : '11:11:11:11:11:12'
         src_ipsub : ('172.16.1.1', '255.255.255.0')
         dst_ipsub : ('172.16.2.1', '255.255.255.0')
@@ -42,17 +41,16 @@ class L3RouteEntry():
         # 別ホスト向け vlan 処理
         parser = self.datapath.ofproto_parser
         match = parser.OFPMatch(in_port=src_port, eth_dst=self.gateway_mac, eth_src=self.gateway_mac, eth_type=0x0800, ipv4_dst=dst_ipsub)
-        actions = [parser.OFPActionPushVlan(), parser.OFPActionSetField(vlan_vid=(0x1000 | vid)), parser.OFPActionSetField(eth_dst=dst_mac), parser.OFPActionOutput(dst_port)]
+        actions = [parser.OFPActionPushVlan(), parser.OFPActionSetField(vlan_vid=(0x1000 | vid)), parser.OFPActionSetField(eth_dst=dst_mac), parser.OFPActionOutput(self.host_outport)]
         self.add_flow(0, 30005, match, actions, 0)
-        match = parser.OFPMatch(vlan_vid=(0x1000 | vid), in_port=dst_port, eth_dst=self.gateway_mac, eth_src=dst_mac, eth_type=0x0800, ipv4_dst=src_ipsub)
+        match = parser.OFPMatch(vlan_vid=(0x1000 | vid), in_port=self.host_outport, eth_dst=self.gateway_mac, eth_src=dst_mac, eth_type=0x0800, ipv4_dst=src_ipsub)
         actions = [parser.OFPActionPopVlan(), parser.OFPActionSetField(eth_src=self.gateway_mac), parser.OFPActionOutput(src_port)]
         self.add_flow(0, 30005, match, actions, 0)
 
-    def in_to_other(self,  src_port, dst_port, gateway_ip, src_ipsub, dst_ipsub, vid):
+    def in_to_other(self, src_port, gateway_ip, src_ipsub, dst_ipsub, vid):
         """
         192.168.0.0/16 <---> 192.168.0.0/16
         src_port : int
-        dst_port : int
         gateway_ip : '192.168.10.1'
         src_ipsub : ('192.168.1.1', '255.255.255.0')
         dst_ipsub : ('192.168.20.1', '255.255.255.0')
@@ -85,7 +83,7 @@ class L3RouteEntry():
         self.add_flow(3, 30000, match, actions, 0)
         # other to in
         actions = [parser.OFPActionPopVlan(), parser.OFPActionSetField(eth_src=self.gateway_mac), parser.OFPActionOutput(src_port)]
-        match = parser.OFPMatch(vlan_vid=(0x1000 | vid), in_port=dst_port, eth_dst=self.gateway_mac, eth_type=0x0800, ipv4_dst=src_ipsub)
+        match = parser.OFPMatch(vlan_vid=(0x1000 | vid), in_port=self.host_outport, eth_dst=self.gateway_mac, eth_type=0x0800, ipv4_dst=src_ipsub)
         self.add_flow(0, 30004, match, actions, 0)
 
     def in_to_wan(self, src_port, gateway_ip, src_ipsub, dst_ipsub, vid):  # NAVT
@@ -203,7 +201,7 @@ class L3RouteEntry():
     def other_to_global(self):
         return
 
-    def register_out_interface(self, gateway_ip, vid, cookie):
+    def register_out_interface(self, gateway_ip, vid):
         # arp_request がきたら arp_replyをつくるエントリーを登録
         ofproto = self.datapath.ofproto
         parser = self.datapath.ofproto_parser
@@ -212,6 +210,7 @@ class L3RouteEntry():
         # cookie 0 : arp reply
         self.add_flow(0, 30000, match, actions, 0)
         match = parser.OFPMatch(vlan_vid=(0x1000 | vid), eth_dst=self.gateway_mac, eth_type=0x0800, ipv4_dst=gateway_ip)
+        # cookie 2 : icmp reply
         self.add_flow(2, 30000, match, actions, 0)
 
     def L2_vlan_L2(self, src_port, dst_port, vid):

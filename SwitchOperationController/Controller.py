@@ -22,13 +22,13 @@ class Operation(app_manager.RyuApp):
         did = ev.msg.datapath.id
         print(did)
         if(did == 1):
-            self.register_route(datapath, "11:11:11:11:11:11", 1)
+            self.register_swex(datapath, "11:11:11:11:11:11", 1)
             self.SwichOperation[1]["static"].in_to_in(1, 2, ('172.16.1.1', '255.255.255.0'), ('172.16.2.1', '255.255.255.0'))
         if(did == 4097):
-            self.register_switch(datapath, "172.16.1.1", "11:11:11:11:11:11", "172.16.1.1", "255.255.255.0", 1, True)
+            self.register_swin(datapath, "172.16.1.1", "11:11:11:11:11:11", "172.16.1.1", "255.255.255.0", 1, True)
             self.SwichOperation[4097]["static"].register_vm("1a:d0:63:c3:9e:2d", 3)
         if(did == 4098):
-            self.register_switch(datapath, "172.16.2.1", "11:11:11:11:11:11", "172.16.2.1", "255.255.255.0", 1, True)
+            self.register_swin(datapath, "172.16.2.1", "11:11:11:11:11:11", "172.16.2.1", "255.255.255.0", 1, True)
             self.SwichOperation[4098]["static"].register_vm("56:0a:9c:e6:86:3e", 2)
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
@@ -41,13 +41,49 @@ class Operation(app_manager.RyuApp):
         sys.stdout.write("\n" + str(datapath.id) + "-" + str(cookie) + "-" + str(port) + " : ")
         self.SwichOperation[datapath.id]["dynamic"].method[cookie](msg, port, data)
 
-    def register_switch(self, datapath, ip, mac, subnet_ip, subnet_mask, port, L2out):
+    def register_swin(self, datapath, ip, mac, subnet_ip, subnet_mask, port, L2out):
         self.SwichOperation[datapath.id] = {
             "static": L2InEntry(datapath=datapath, mac=mac, port=port, subnet_ip=subnet_ip, subnet_mask=subnet_mask, L2out=L2out),
             "dynamic": L2ExEntry(datapath=datapath, ip=ip, mac=mac, port=port, subnet_ip=subnet_ip, subnet_mask=subnet_mask),
         }
 
-    def register_route(self, datapath, mac, port):
+    def register_swex(self, datapath, mac, port):
         self.SwichOperation[datapath.id] = {
             "static": L3RouteEntry(datapath=datapath, mac=mac, port=port),
         }
+
+    def register_in_to_in(self, swex_id, swin1_id, swin2_id):
+        swin1_port = self.SwichOperation[swin1_id]["dynamic"].gateway_port
+        swin1_ipsub = (self.SwichOperation[swin1_id]["dynamic"].gateway_subnet_ip,  self.SwichOperation[swin1_id]["dynamic"].gateway_subnet_mask)
+        swin2_port = self.SwichOperation[swin2_id]["dynamic"].gateway_port
+        swin2_ipsub = (self.SwichOperation[swin2_id]["dynamic"].gateway_subnet_ip,  self.SwichOperation[swin2_id]["dynamic"].gateway_subnet_mask)
+        self.SwichOperation[swex_id]["dynamic"].in_to_in(swin1_port, swin2_port, swin1_ipsub, swin2_ipsub)
+
+    def register_in_vlan_Host(self, swex1_id, swin1_id, swex2_id, swin2_id, vid):
+        swin1_port = self.SwichOperation[swin1_id]["dynamic"].gateway_port
+        swin1_ipsub = (self.SwichOperation[swin1_id]["dynamic"].gateway_subnet_ip,  self.SwichOperation[swin1_id]["dynamic"].gateway_subnet_mask)
+        swin1_mac = self.SwichOperation[swin1_id]["dynamic"].gateway_mac
+        swin2_port = self.SwichOperation[swin2_id]["dynamic"].gateway_port
+        swin2_ipsub = (self.SwichOperation[swin2_id]["dynamic"].gateway_subnet_ip,  self.SwichOperation[swin2_id]["dynamic"].gateway_subnet_mask)
+        swin2_mac = self.SwichOperation[swin2_id]["dynamic"].gateway_mac
+        self.SwichOperation[swex1_id]["dynamic"].in_vlan_Host(swin1_port, swin1_mac, swin1_ipsub, swin2_ipsub, vid)
+        self.SwichOperation[swex2_id]["dynamic"].in_vlan_Host(swin2_port, swin2_mac, swin2_ipsub, swin1_ipsub, vid)
+
+    def register_in_to_other(self, swex_id, swin1_id, gateway_ip, dst_ipsub, vid):
+        self.SwichOperation[swex_id]["dynamic"].register_out_interface(gateway_ip, vid)
+        swin1_port = self.SwichOperation[swin1_id]["dynamic"].gateway_port
+        swin1_ipsub = (self.SwichOperation[swin1_id]["dynamic"].gateway_subnet_ip,  self.SwichOperation[swin1_id]["dynamic"].gateway_subnet_mask)
+        self.SwichOperation[swex_id]["dynamic"].in_to_other(swin1_port, gateway_ip, swin1_ipsub, dst_ipsub, vid)
+
+    def register_in_to_wan(self, swex_id, swin1_id, gateway_ip, dst_ipsub, vid):
+        self.SwichOperation[swex_id]["dynamic"].register_out_interface(gateway_ip, vid)
+        swin1_port = self.SwichOperation[swin1_id]["dynamic"].gateway_port
+        swin1_ipsub = (self.SwichOperation[swin1_id]["dynamic"].gateway_subnet_ip,  self.SwichOperation[swin1_id]["dynamic"].gateway_subnet_mask)
+        self.SwichOperation[swex_id]["dynamic"].in_to_wan(swin1_port, gateway_ip, swin1_ipsub, dst_ipsub, vid)
+
+    def register_in_to_global(self, swex_id, swin1_id, gateway_ip, dst_ipsub, vid, gr_mac):
+        self.SwichOperation[swex_id]["dynamic"].register_out_interface(gateway_ip, vid)
+        swin1_port = self.SwichOperation[swin1_id]["dynamic"].gateway_port
+        swin1_ipsub = (self.SwichOperation[swin1_id]["dynamic"].gateway_subnet_ip,  self.SwichOperation[swin1_id]["dynamic"].gateway_subnet_mask)
+        self.SwichOperation[swex_id]["dynamic"].in_to_wan(swin1_port, gateway_ip, swin1_ipsub, dst_ipsub, vid)
+        self.SwichOperation[swex_id]["dynamic"].in_to_global(swin1_port, gr_mac)
