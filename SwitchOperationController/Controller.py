@@ -25,8 +25,8 @@ class Operation(app_manager.RyuApp):
             self.register_swex(datapath, "11:11:11:11:11:11", 1)
             self.SwichOperation[1]["dynamic"].in_to_in(1, 2, ('172.16.1.1', '255.255.255.0'), ('172.16.2.1', '255.255.255.0'))
         if(did == 4097):
-            self.register_swin(datapath, "172.16.1.1", "11:11:11:11:11:11", "172.16.1.1", "255.255.255.0", 1, True)
-            self.SwichOperation[4097]["static"].register_vm("1a:d0:63:c3:9e:2d", 3)
+            self.register_swin_d(datapath, "172.16.1.1", "11:11:11:11:11:11", "172.16.1.1", "255.255.255.0", 1, True)
+            # self.SwichOperation[4097]["static"].register_vm("1a:d0:63:c3:9e:2d", 3)
         if(did == 4098):
             self.register_swin(datapath, "172.16.2.1", "11:11:11:11:11:11", "172.16.2.1", "255.255.255.0", 1, True)
             self.SwichOperation[4098]["static"].register_vm("56:0a:9c:e6:86:3e", 2)
@@ -44,6 +44,11 @@ class Operation(app_manager.RyuApp):
     def register_swin(self, datapath, ip, mac, subnet_ip, subnet_mask, port, L2out):
         self.SwichOperation[datapath.id] = {
             "static": L2InEntry(datapath=datapath, mac=mac, port=port, subnet_ip=subnet_ip, subnet_mask=subnet_mask, L2out=L2out),
+            "dynamic": L2ExEntry(datapath=datapath, ip=ip, mac=mac, port=port, subnet_ip=subnet_ip, subnet_mask=subnet_mask),
+        }
+
+    def register_swin_d(self, datapath, ip, mac, subnet_ip, subnet_mask, port, L2out):
+        self.SwichOperation[datapath.id] = {
             "dynamic": L2ExEntry(datapath=datapath, ip=ip, mac=mac, port=port, subnet_ip=subnet_ip, subnet_mask=subnet_mask),
         }
 
